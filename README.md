@@ -17,11 +17,13 @@ You will be prompted for what you want to create. An example might be "Create a 
 
 ## Configuration
 
-It currently only requires an OpenAI API token to applied to:
+Add your OpenAI token to the settings JSON/UI.
 
 ```
 	"gpt-template.token": "sk-qkjKAcpQTPGKLEkFfvDbT3BlbkFJ...",
 ```
+
+![Settings](./assets/settings.png)
 
 ## Release Notes
 
