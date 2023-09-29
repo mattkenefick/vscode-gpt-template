@@ -1,4 +1,7 @@
 {
+	"activationEvents": [
+		"onCommand:gpt-template.useAsTemplate"
+	],
 	"author": {
 		"email": "matt@polymermallard.com",
 		"name": "Matt Kenefick"
