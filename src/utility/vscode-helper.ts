@@ -1,9 +1,12 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 
-let buckOutput = vscode.window.createOutputChannel('buck');
+let output = vscode.window.createOutputChannel('Polymer Mallard');
 
 /**
- * @class VsCodeHelper
+ * @author Matt Kenefick <matt.kenefick@buck.co>
+ * @package Utility
+ * @project GPT Template
  */
 export default class VsCodeHelper {
 	/**
@@ -16,7 +19,7 @@ export default class VsCodeHelper {
 
 		// Exit if we don't have the references we need
 		if (!editor || !document) {
-			console.warn('Exiting because we dont have something');
+			this.log('Exiting because we dont have something');
 			return;
 		}
 		const lastLine = document.lineAt(document.lineCount - 1);
@@ -35,7 +38,7 @@ export default class VsCodeHelper {
 
 		// Exit if we don't have the references we need
 		if (!editor || !document) {
-			console.warn('Exiting because we dont have something');
+			this.log('Exiting because we dont have something');
 			return;
 		}
 
@@ -49,6 +52,54 @@ export default class VsCodeHelper {
 		editor?.edit((editBuilder) => {
 			editBuilder.delete(range);
 		});
+	}
+
+	/**
+	 * @param vscode.Uri fileUri
+	 * @param string content
+	 * @return Promise<void>
+	 */
+	public static async createFile(fileUri: string, content: string): Promise<void> {
+		// Write text to new file
+		fs.writeFileSync(fileUri.toString(), content);
+
+		// Open the new document
+		const newDocument = await vscode.workspace.openTextDocument(fileUri);
+		await vscode.window.showTextDocument(newDocument);
+	}
+
+	/**
+	 * @param string text
+	 * @param string tooltip
+	 * @param string command
+	 * @return vscode.StatusBarItem
+	 */
+	public static createIcon(text: string, tooltip: string, command: string): vscode.StatusBarItem {
+		let statusBarIcon = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+		statusBarIcon.text = '$(sync~spin) Creating Template...';
+		statusBarIcon.tooltip = 'Click to cancel';
+		statusBarIcon.command = 'gpt-template.cancelRequest';
+		statusBarIcon.show();
+
+		return statusBarIcon;
+	}
+
+	/**
+	 * Get text of current active document
+	 *
+	 * @return string
+	 */
+	public static getActiveText(): string {
+		const editor = vscode.window.activeTextEditor;
+		const document: vscode.TextDocument | undefined = editor?.document;
+
+		// Exit if we don't have the references we need
+		if (!editor || !document) {
+			this.log('Exiting because we dont have something');
+			return '';
+		}
+
+		return document.getText();
 	}
 
 	/**
@@ -75,6 +126,22 @@ export default class VsCodeHelper {
 	}
 
 	/**
+	 * @return boolean
+	 */
+	public static hasActiveDocument(): boolean {
+		const editor = vscode.window.activeTextEditor;
+		const document: vscode.TextDocument | undefined = editor?.document;
+
+		// Exit if we don't have the references we need
+		if (!editor || !document) {
+			this.log('Exiting because we dont have something');
+			return false;
+		}
+
+		return !!document;
+	}
+
+	/**
 	 * @param number amount
 	 * @return void
 	 */
@@ -84,11 +151,26 @@ export default class VsCodeHelper {
 	}
 
 	/**
-	 * @param string text
+	 * @param any text
 	 * @return void
 	 */
-	public static log(text: string): void {
-		buckOutput.appendLine(text);
+	public static log(text: any): void {
+		output.appendLine(text);
+	}
+
+	/**
+	 * @param string content
+	 * @param string language
+	 * @param boolean showImmediately
+	 * @return Promise<void>
+	 */
+	public static async newFile(content: string = '', language: string = 'plaintext', showImmediately: boolean = true): Promise<void> {
+		const newFile = await vscode.workspace.openTextDocument({
+			content: content,
+			language: language,
+		});
+
+		showImmediately && (await vscode.window.showTextDocument(newFile));
 	}
 
 	/**
@@ -118,7 +200,7 @@ export default class VsCodeHelper {
 
 		// Exit if we don't have the references we need
 		if (!editor || !document || !selections) {
-			console.warn('Exiting because we dont have something');
+			this.log('Exiting because we dont have something');
 			return;
 		}
 
@@ -144,7 +226,7 @@ export default class VsCodeHelper {
 
 		// Exit if we don't have the references we need
 		if (!editor || !document) {
-			console.warn('Exiting because we dont have something');
+			this.log('Exiting because we dont have something');
 			return;
 		}
 
@@ -153,6 +235,23 @@ export default class VsCodeHelper {
 		editor.edit((editBuilder) => {
 			editBuilder.replace(fullRange, text);
 		});
+	}
+
+	/**
+	 * @return Promise<void>
+	 */
+	public static async save(): Promise<void> {
+		const editor = vscode.window.activeTextEditor;
+		const document: vscode.TextDocument | undefined = editor?.document;
+
+		// Exit if we don't have the references we need
+		if (!editor || !document) {
+			this.log('Exiting because we dont have something');
+			return;
+		}
+
+		// Write text to new file
+		await document.save();
 	}
 
 	/**
