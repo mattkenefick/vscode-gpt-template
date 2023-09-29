@@ -8,9 +8,17 @@ import axios, { AxiosRequestConfig } from 'axios';
 type IGptMessageRole = 'user' | 'assistant' | 'system';
 
 /**
+ * @type type
+ */
+type CancellablePromise<T> = {
+	cancel: () => void;
+	promise: Promise<T>;
+};
+
+/**
  * @type interface
  */
-interface IGptMessage {
+export interface IGptMessage {
 	content: string;
 	pin?: boolean;
 	role: IGptMessageRole;
@@ -20,7 +28,7 @@ interface IGptMessage {
 /**
  * @type interface
  */
-interface IGptChoice {
+export interface IGptChoice {
 	finish_reason: string;
 	index: number;
 	message: IGptMessage;
@@ -88,7 +96,7 @@ export async function gpt(messages: IGptMessage[] = [], token: string = ''): Pro
  * @param Function callback
  * @return Promise<string>
  */
-export async function gptStream(messages: IGptMessage[] = [], token: string = '', callback: (content: string) => void): Promise<string> {
+export function gptStream(messages: IGptMessage[] = [], token: string = '', callback: (content: string) => void): CancellablePromise<string> {
 	const headers = {
 		'Authorization': 'Bearer ' + token,
 		'Content-Type': 'application/json',
@@ -101,22 +109,28 @@ export async function gptStream(messages: IGptMessage[] = [], token: string = ''
 		stream: true,
 	};
 	let outputString: string = '';
+	let cancel;
 
-	return new Promise((resolve, reject) => {
-		fetch(url, {
+	const promise: Promise<string> = new Promise((resolve, reject) => {
+		const controller = new AbortController();
+		const { signal } = controller;
+		let hasCanceled: boolean = false;
+
+		const request = fetch(url, {
 			body: JSON.stringify(data),
 			cache: 'no-cache',
 			headers: headers,
 			method: 'POST',
 			mode: 'cors',
+			signal: signal,
 		}).then((response) => {
 			let reader: ReadableStreamDefaultReader<string>;
 
 			if (response.ok && response.body) {
 				function readStream() {
 					reader.read().then(({ value, done }) => {
-						if (done) {
-							reader.cancel();
+						if (done || hasCanceled) {
+							reader?.cancel && reader.cancel();
 							return resolve(outputString);
 						}
 
@@ -154,7 +168,15 @@ export async function gptStream(messages: IGptMessage[] = [], token: string = ''
 				return reject(response);
 			}
 		});
+
+		cancel = (callback) => {
+			controller.abort();
+			hasCanceled = true;
+			callback && callback();
+		};
 	});
+
+	return { cancel, promise };
 }
 
 /**

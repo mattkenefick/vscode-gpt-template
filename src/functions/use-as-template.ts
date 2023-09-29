@@ -1,9 +1,31 @@
 import * as vscode from 'vscode';
 import Settings from '../config/settings';
 import VsCodeHelper from '../utility/vscode-helper';
-import { gptStream, ChatGPT } from './gptbuilder';
+import { gptStream, IGptMessage } from './gptbuilder';
+
+let statusBarIcon: vscode.StatusBarItem;
+let cancelFunction: () => void;
 
 /**
+ * @return void
+ */
+function removeStatusIcon(): void {
+	statusBarIcon && statusBarIcon.dispose();
+}
+
+/**
+ * @return void
+ */
+export async function cancelRequest(): Promise<void> {
+	// Remove status bar item
+	removeStatusIcon();
+
+	// Cancel
+	cancelFunction && cancelFunction();
+}
+
+/**
+ * @param vscode.Uri fileUri
  * @return Promise<void>
  */
 export async function useAsTemplate(fileUri: vscode.Uri): Promise<void> {
@@ -20,13 +42,21 @@ export async function useAsTemplate(fileUri: vscode.Uri): Promise<void> {
 		prompt: 'What would you like to do with this template?',
 	});
 
+	// Get save location
+	const saveAs = await vscode.window.showInputBox({
+		prompt: 'Name this file (leave empty for new file)',
+	});
+
+	// vscode.window.showQuickPick(['Option 1', 'Option 2', 'Option 3'], {
+	// 	placeHolder: 'Pick an option',
+	// });
+
 	// If purpose is set, then continue
 	if (purpose && Settings.token) {
 		let response;
-		let results = 0;
 
-		// VScode extension, print console log
-		vscode.window.showInformationMessage(`Requesting new templated file...`);
+		// Create status icon
+		statusBarIcon = VsCodeHelper.createIcon('$(sync~spin) Creating Template...', 'Click to cancel', 'gpt-template.cancelRequest');
 
 		// If fileUri isn't available, then get text from open file
 		if (!fileUri && editor) {
@@ -36,56 +66,88 @@ export async function useAsTemplate(fileUri: vscode.Uri): Promise<void> {
 		// Read contents from fileUri
 		const language: string = await VsCodeHelper.getLanguageFromFile(fileUri);
 		const fileContent: string = await VsCodeHelper.getTextFromFile(fileUri);
+		const hasActiveDocument: boolean = VsCodeHelper.hasActiveDocument();
+		const activeDocumentText: string = VsCodeHelper.getActiveText();
+		const defaultText: string = 'Waiting for response\n(Formatting will come after)';
 
-		// Create GPT request
-		const gptBuilder = new ChatGPT(Settings.token);
-		gptBuilder.debug = true;
-		// gptBuilder.pinSystem(`You are helping me create new code snippets. Only return the code as one file, do not provide context or explanations. Here is an example of the template you will follow:\n\n${fileContent}`);
-		// response = await gptBuilder.ask(`I want to: ${purpose}`);
+		// Create an saved file
+		if (saveAs) {
+			const outputPath = fileUri.fsPath.split('/').slice(0, -1).join('/');
+			const saveUri = `${outputPath}/${saveAs}`;
 
-		// Create an untitled file with the specified content
-		const newFile = await vscode.workspace.openTextDocument({
-			language: language,
-			content: 'Waiting for response...',
-		});
+			VsCodeHelper.log(`Saving file to ${saveUri}`);
 
-		// Show new doc
-		await vscode.window.showTextDocument(newFile);
+			await VsCodeHelper.createFile(saveUri, defaultText);
+		}
 
-		// Fetch stream of data
-		gptStream(
-			[
-				{
-					content: `You are helping me create new code snippets. Only return the code as one file, do not provide context or explanations. Here is an example of the template you will follow:\n\n${fileContent}`,
-					role: 'system',
-				},
-				{
-					content: `I want to: ${purpose}`,
-					role: 'user',
-				},
-			],
-			Settings.token,
+		// Create new file
+		else if (!hasActiveDocument || activeDocumentText) {
+			await VsCodeHelper.newFile(defaultText, language);
+		}
 
-			// Append content to open document
-			(content: string) => {
-				// Log
-				VsCodeHelper.log(content);
+		// Create content
+		response = await fetchStream(fileContent, purpose);
 
-				// Clear placeholder
-				if (results++ === 0) {
-					VsCodeHelper.replace(content);
-				} else {
-					VsCodeHelper.append(content);
-				}
-			},
-		)
-			// Replace entire document with final content
-			.then((final: string) => {
-				VsCodeHelper.replace(final);
-				VsCodeHelper.log(final);
-				VsCodeHelper.indent(4);
-			});
+		// Check if we have a relative filename and save the current document
+		if (saveAs) {
+			await VsCodeHelper.save();
+		}
 	} else {
 		vscode.window.showErrorMessage('No purpose was provided. Please try again.');
 	}
+}
+
+/**
+ * @param string fileContent
+ * @param string purpose
+ * @return Promise<string>
+ */
+async function fetchStream(fileContent: string, purpose: string): Promise<string> {
+	let results: number = 0;
+	const options: IGptMessage[] = [
+		{
+			content: `You are helping me create new code snippets. Respond with just the code as a single file, do not provide context or explanations. Here the template you should follow:\n\n${fileContent}`,
+			role: 'system',
+		},
+		{
+			content: `I want to: ${purpose}`,
+			role: 'user',
+		},
+	];
+
+	/**
+	 * @param string content
+	 * @return void
+	 */
+	function onComplete(content: string): void {
+		VsCodeHelper.replace(content);
+		VsCodeHelper.log(content);
+		VsCodeHelper.indent(4);
+
+		removeStatusIcon();
+	}
+
+	/**
+	 * @param string content
+	 * @return void
+	 */
+	function onPartial(content: string): void {
+		// Log
+		VsCodeHelper.log(content);
+
+		// Clear placeholder
+		if (results++ === 0) {
+			VsCodeHelper.replace(content);
+		} else {
+			VsCodeHelper.append(content);
+		}
+	}
+
+	// Fetch stream of data
+	const { cancel, promise } = gptStream(options, Settings.token, onPartial);
+
+	cancelFunction = cancel;
+	promise.then(onComplete);
+
+	return promise;
 }

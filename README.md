@@ -25,6 +25,13 @@ It currently only requires an OpenAI API token to applied to:
 
 ## Release Notes
 
+### 0.3.0
+
+-   Ability to cancel active generations (in status bar)
+-   Open new file if nothing is open
+-   Write to existing file if it's empty
+-   Optionally save to relative path
+
 ### 0.2.0
 
 -   Update app icon
