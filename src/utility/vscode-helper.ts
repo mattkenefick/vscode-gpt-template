@@ -4,7 +4,7 @@ import * as fs from 'fs';
 let output = vscode.window.createOutputChannel('Polymer Mallard');
 
 /**
- * @author Matt Kenefick <matt.kenefick@buck.co>
+ * @author Matt Kenefick <matt@polymermallard.com>
  * @package Utility
  * @project GPT Template
  */
