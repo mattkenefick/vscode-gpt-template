@@ -25,6 +25,13 @@ It currently only requires an OpenAI API token to applied to:
 
 ## Release Notes
 
+### 0.2.0
+
+-   Update app icon
+-   Add GPT streaming
+-   Update example GIF
+-   Use Settings class
+
 ### 0.1.0
 
 Initial release
