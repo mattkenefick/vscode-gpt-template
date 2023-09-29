@@ -8,8 +8,8 @@ export async function useAsTemplate(fileUri: vscode.Uri): Promise<void> {
 	const editor = vscode.window.activeTextEditor;
 
 	// Read settings for this extension
-	const config = vscode.workspace.getConfiguration('gpt-template');
-	const token = config.get('token');
+	const config: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration('gpt-template');
+	const token: string = config.get('token') as string;
 
 	// Get API token from settings
 	if (!token) {
@@ -23,17 +23,15 @@ export async function useAsTemplate(fileUri: vscode.Uri): Promise<void> {
 	});
 
 	// If purpose is set, then continue
-	if (purpose) {
+	if (purpose && token) {
 		let response;
 
 		// VScode extension, print console log
 		vscode.window.showInformationMessage(`Requesting new templated file...`);
 
 		// If fileUri isn't available, then get text from open file
-		if (!fileUri) {
-			if (editor) {
-				fileUri = editor.document.uri;
-			}
+		if (!fileUri && editor) {
+			fileUri = editor.document.uri;
 		}
 
 		// Read contents from fileUri
@@ -52,6 +50,9 @@ export async function useAsTemplate(fileUri: vscode.Uri): Promise<void> {
 			language: language,
 			content: response,
 		});
+
+		// VScode extension, print console log
+		vscode.window.showInformationMessage(`Response received.`);
 
 		// Show new doc
 		await vscode.window.showTextDocument(newFile);
