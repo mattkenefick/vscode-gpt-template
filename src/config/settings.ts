@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
 
 /**
- * @object Settings
+ * @author Matt Kenefick <matt@polymermallard.com>
+ * @package Config
+ * @project GPT Template
  */
 export default class Settings {
 	/**
